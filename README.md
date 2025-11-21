@@ -10,5 +10,133 @@ In this lab, I will:
 * Install a backdoor on the compromised host to maintain access.
 * Hide traces on the victim system by installing and configuring a rootkit.
 
-## Lab configuration
-Two virtual hosts running Linux operating system are required to achieve this lab. The first is the attacker machine and is running **Kali Linux** (an Advanced Penetration Testing Linux distribution used for Penetration Testing). The second is the victim machine running **Metasploitable 2** (an intentionally vulnerable Ubuntu Linux virtual machine designed for testing common vulnerabilities). The two network adapters of these machines are attached to a NAT Network, so that they can communicate to each other and talk to outside (main host, local network, and internet).
+---
+
+## 🛠️ Lab Setup
+Two virtual hosts running Linux operating system are required to achieve this lab. The first is the attacker machine and is running **Kali Linux** (an Advanced Penetration Testing Linux distribution used for Penetration Testing). The second is the victim machine running **Metasploitable 2** (an intentionally vulnerable Ubuntu Linux virtual machine designed for testing common vulnerabilities). The two network adapters of these machines are attached to a **NAT Network**, so that they can communicate to each other and talk to outside (main host, local network, and internet).
+
+![Network Architecture](/images/network.png)
+
+---
+
+
+### ⚙️ Lab Setup: Instaling Kali linux:
+
+#### Step 1: Download the Pre-Built VM Image
+
+1.  Navigate to the official Kali Linux virtual machine download page:
+    * **Link:** `https://www.kali.org/get-kali/#kali-virtual-machines`
+2.  Scroll to the **Pre-built VM** section.
+3.  Select the download option corresponding to your virtualization platform (e.g., **VirtualBox**).
+4.  Click **Download** to obtain the compressed file (usually a `.7z` or `.zip` archive).
+5.  **Extract** the contents of the downloaded archive file. This will yield the `.vbox` and `.vdi` files for the VM.
+
+#### Step 2: Import the VM into VirtualBox
+
+1.  Open the **VirtualBox Manager**.
+2.  Import the virtual machine using one of the following methods:
+    * Click the **Add** machine icon (usually a blue `+` sign) and select the extracted **`.vbox`** configuration file.
+    * Alternatively, **double-click** the extracted **`.vbox`** file directly from your file explorer.
+3.  The Kali Linux VM instance will be automatically added to the VirtualBox list.
+
+
+
+---
+
+### 🎯 Lab Setup: Installing Metasploitable 2 VM
+
+Metasploitable 2 is downloaded as a virtual hard disk file (`.vmdk`) that must be manually configured into a new VirtualBox machine.
+
+#### Step 1: Download the VM Disk Image
+
+1.  Navigate to the Metasploitable project files page on SourceForge:
+    * **Link:** `https://sourceforge.net/projects/metasploitable/files/Metasploitable2/`
+2.  Click the **Download** button for the latest Metasploitable 2 release.
+3.  The file will download in a **ZIP format** and contains the virtual hard disk file (**.vmdk**).
+4.  **Extract** the contents of the ZIP archive.
+
+#### Step 2 Create and Configure the VM
+
+1.  Open the **VirtualBox Manager**.
+2.  Click the **New** button to create a new Virtual Machine.
+3.  Configure the initial settings in the pop-up window:
+    * **Name:** Choose a descriptive name (e.g., `Metasploitable-2`).
+    * **Folder:** Leave as the default path unless a custom location is desired.
+    * **Type:** **Linux**
+    * **Version:** **Other Linux (64-bit)**
+4.  Set the **Memory size (RAM)**. The recommended minimum is **512 MB**.
+5.  In the **Hard Disk** section, select the option: **Use an existing virtual hard disk file**.
+6.  Click the folder icon, then browse to and select the extracted **`.vmdk`** file from the Metasploitable 2 archive.
+7.  Click **Create** to finalize the VM creation.
+
+The Metasploitable 2 instance is now ready in the VirtualBox list.
+
+
+### 🛠️ Lab Setup: Creating a Custom NAT Network
+
+This procedure details the steps for configuring a dedicated **NAT Network** within your virtualization software (e.g., VirtualBox). This isolates your Kali Linux and Metasploitable 2 Virtual Machines (VMs) in a private network, facilitating safe and realistic penetration testing without exposing the lab environment to your host machine's primary network or the wider internet.
+
+---
+
+#### Step 1: Configure the Custom NAT Network
+
+Follow these steps to define a new, isolated virtual network that both VMs will share.
+
+1.  Navigate to the **VirtualBox Manager** application.
+2.  Go to **File** $\rightarrow$ **Tools** $\rightarrow$ **Network Manager** (or simply press `Ctrl + H`).
+3.  Select the **NAT Networks** tab.
+4.  Click the **Create** icon (usually a **+** sign).
+5.  A new NAT Network will be created with default settings.
+    * **Recommendation:** **Rename** the network (e.g., `PenTest-Lab-Net`) for clear identification.
+6.  Click **OK** to save and close the Network Manager.
+
+
+#### Step 2: Assign VMs to the Custom NAT Network
+
+You must configure both the Kali Linux and Metasploitable 2 VMs to use the network created in Step 1.
+
+1.  In the VirtualBox Manager, select the **Kali Linux** VM.
+2.  Click the **Settings** icon.
+3.  Navigate to the **Network** category.
+4.  In the **Adapter 1** tab:
+    * Set the **Attached to:** option to **NAT Network**.
+    * From the **Name** dropdown menu, select the custom network you created (e.g., `PenTest-Lab-Net`).
+5.  Click **OK** to apply the settings for the Kali Linux VM.
+6.  **Repeat steps 1 through 5** for the **Metasploitable 2** VM, ensuring it is also set to the *same* **NAT Network**.
+
+## Penetration Testing Methodology
+
+### Step 1: Information gathering
+
+This step focuses on gathering essential network configuration data from the attacker machine (Kali Linux) using standard command-line tools. This information is crucial for planning subsequent penetration testing activities.
+
+1.  **Start** both the **Kali Linux** and **Metasploitable 2** Virtual Machines.Log in to the **Kali Linux** attacker machine.(By default username: kali & password: kali) and open a terminal window and execute the following commands:
+
+    * **To find the IP Address and Netmask:**
+        ```bash
+        ifconfig
+        ```
+
+    * **To find the Default Gateway Address:**
+        ```bash
+        netstat -r
+        ```
+  ![Kali Linux' ip](/images/ifconfig.png)
+  ![Getway Address](/images/netstat_r_getway.png)
+
+In our case, the IP address of the attacker machine is 10.0.2.15, the IP network address is 10.0.2.0/24
+and the gateway IP address is 10.0.2.1.
+
+2. Do a **Host Discovery Scan** on the entire target subnet to determine which hosts are currently online.
+   
+   From the terminal of the Kali Linux attacker machine, execute the following `nmap` command. We use the IP network address identified previously.
+
+```bash
+nmap -sn 10.0.2.0/24
+```
+
+
+
+
+
+
