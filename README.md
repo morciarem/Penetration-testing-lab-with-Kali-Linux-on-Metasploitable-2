@@ -124,16 +124,100 @@ This step focuses on gathering essential network configuration data from the att
   ![Kali Linux' ip](/images/ifconfig.png)
   ![Getway Address](/images/netstat_r_getway.png)
 
-In our case, the IP address of the attacker machine is 10.0.2.15, the IP network address is 10.0.2.0/24
-and the gateway IP address is 10.0.2.1.
+   In our case, the IP address of the attacker machine is 10.0.2.15, the IP network address is 10.0.2.0/24
+   and the gateway IP address is 10.0.2.1.
 
 2. Do a **Host Discovery Scan** on the entire target subnet to determine which hosts are currently online.
    
    From the terminal of the Kali Linux attacker machine, execute the following `nmap` command. We use the IP network address identified previously.
 
-```bash
-nmap -sn 10.0.2.0/24
-```
+   ```bash
+   nmap -sn 10.0.2.0/24
+   ```
+   ![Host Discovery](/images/host_discovery.png)
+   
+   Looking at the VirtualBox documentation, we can confirm the default address allocations for a custom NAT network, which helps identify the Metasploitable 2 target:
+
+   | IP Address | Role in NAT Network |
+   | :--- | :--- |
+   | `10.0.2.2` | Host's Loopback Address |
+   | `10.0.2.3` | DHCP Server |
+   | `10.0.2.1` | Default Gateway |
+   
+   Since your `nmap` scan results confirmed:
+   * **Attacker (Kali) Machine IP:** `10.0.2.15`
+   * **Default Gateway IP:** `10.0.2.1`
+   
+   By elimination, the remaining active host found in the scan, **`10.0.2.4`**, is confirmed to be the **Target Machine (Metasploitable 2)**.
+
+3. Do a **Service Discovery** on open ports after having successfully identified the target host's IP address , the next crucial phase is to perform a **port scan**. This determines which network services are running and accessible on the target machine.
+   
+   From the Kali Linux terminal, execute the following `nmap` command using the target IP address (e.g., `10.0.2.4`):
+
+   ```bash
+   sudo nmap -sS 10.0.2.4
+   ```
+   ![Service Discovery](/images/service_discovery.png)
+
+   The scan output confirms 23 open ports. These ports host various network services (e.g., FTP, SSH, HTTP, MySQL, Telnet) which are often configured with known, exploitable vulnerabilities.
+
+### Step 2: Information gathering
+
+   After obtaining a preliminary overview of the target, the attacker moves further to know the exact services running on the target system (including types and versions) and other information such as users, shares, and DNS entries. Enumeration prepares a clearer blueprint of the target.
+
+1.  Nmap has a special flag to activate aggressive detection, namely `-A`, which enables **OS detection** ($-O$), **version detection** ($-sV$), **script scanning** ($-sC$), and **traceroute** ($--traceroute$). This mode sends more probes, providing a lot of valuable host information.
+
+   Execute the aggressive detection using the following command:
+    ```bash
+    $ sudo nmap -A 10.0.2.4
+    ```
+
+    ![HTTP Service](/images/http.png)
+    ![Target information](/images/host_infos.png)
+
+   From the obtained results, we discovered that:
+    * The OS installed on the target machine is **Linux 2.6**.
+    * The kernel version is **`linux_kernel:2.6`**.
+    * The hostname is **`metasploitable`**.
+    * There is an **HTTP service** running on port 80, which is **`Apache/2.2.8 (Ubuntu) DAV/2`**.
+
+
+
+2. After identifying the running web service on port 80, the next step is to access the service via a web browser to confirm the existence and nature of the web applications hosted on the target system.
+   
+   From the **Attacker Machine (Kali Linux)**, open the **Firefox** web browser.
+   In the address bar, connect to the target system on port 80 by entering the following URL (using the identified target IP address):
+       ```
+       http://10.0.2.4
+       ```
+   ![HTTP Service](/images/web_service.png)
+   
+   You will notice the existence of several intentionally vulnerable web applications. We will focus specifically on **DVWA** (Damn Vulnerable Web Application), a PHP/MySQL application designed for educational purposes.
+   Navigate to the DVWA login page:
+       ```
+       [http://10.0.2.5/dvwa/login.php](http://10.0.2.4/dvwa/login.php)
+       ```
+   
+   
+
+3. To systematically discover common security issues and potential vulnerabilities in the web application, we will employ the automated web vulnerability scanner, **Nikto** to scan the DVWA application and identify common misconfigurations, potentially dangerous files, and known vulnerabilities.
+
+
+   Execute the `nikto` command from the Kali Linux terminal, specifying the target URL:
+   
+   ```bash
+   $ nikto -h [http://10.0.2.5/dvwa](http://10.0.2.5/dvwa)
+   ```
+   ![HTTP Service](/images/nikto_scan.png)
+
+   The scan reveal the existence of an accessible modification history file, such as CHANGELOG.txt.
+   
+5. From the **Attacker Machine (Kali Linux)**, open the Firefox browser and navigate directly to the file using the following URL:
+    ```
+    [http://10.0.2.5/dvwa/CHANGELOG.txt](http://10.0.2.5/dvwa/CHANGELOG.txt)
+    ```
+    ![HTTP Service](/images/changelog.png)
+    A quick review of the file's content reveals development notes and modification history.This discovery is highly valuable, as the attacker now has a confirmed **valid username (`admin`)** for the target application, which simplifies the subsequent task of cracking or bypassing the authentication mechanism.
 
 
 
