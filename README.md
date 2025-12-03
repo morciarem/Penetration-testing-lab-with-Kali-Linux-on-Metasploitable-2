@@ -684,7 +684,7 @@ The UDEV exploit requires the Process ID (PID) of the **Netlink socket** as an a
     In the current root-privileged shell session, execute the following Python command:
    
     ```bash
-       python -c 'import os;os.setuid(0);os.system("/bin/bash -p")'
+    python -c 'import os;os.setuid(0);os.system("/bin/bash -p")'
     ```
    
    | Command Part | Function | Significance |
