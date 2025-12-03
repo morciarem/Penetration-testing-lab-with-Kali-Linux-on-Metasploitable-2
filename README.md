@@ -2,8 +2,7 @@
 
 ## ⚠️ Disclaimer
 
-This document details ethical hacking techniques strictly for educational purposes within a controlled, authorized virtual lab environment. Do not use this information against any system you do not own or have explicit permission to test; doing so is illegal. I assume no liability for misuse. The true goal is to teach defensive security against these threats.
-
+This document details ethical hacking techniques strictly for educational purposes within a controlled, authorized virtual lab environment. Do not use this information against any system you do not own or have explicit permission to test; doing so is illegal. I assume no liability for misuse.
 ## Purpose
 The aim of this lab is to experience ethical hacking in a virtual environment composed of two virtual machines: an attacker machine running Kali Linux (an Advanced Penetration Testing Linux distribution used for Penetration Testing) and a victim host running Metasploitable 2 (an intentionally vulnerable Ubuntu Linux virtual machine designed for testing common vulnerabilities).
 In this lab, I will:
