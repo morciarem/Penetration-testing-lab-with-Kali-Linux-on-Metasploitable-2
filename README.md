@@ -807,7 +807,7 @@ rootkit has been successfully downloaded and extract it on the victim host.
    ```
 
    > **note :** if you turned off your machine after the last time you start the apache2 service(step4.3) you need to restart it again using :
-   > ```bash
+     ```bash
          sudo service apache2 start
          sudo service apache2 status
      ```
