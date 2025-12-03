@@ -680,12 +680,12 @@ The UDEV exploit requires the Process ID (PID) of the **Netlink socket** as an a
 
     This command imports the `os` module in Python to explicitly set both the Real and Effective User IDs to `0` (`root`), and then executes a persistent Bash shell (`/bin/bash -p`).
     
-   **Goal:** Establish a permanent, stable, and fully privileged Bash session by explicitly setting the UID to 0.
-    In the current root-privileged shell session, execute the following Python command:
+      **Goal:** Establish a permanent, stable, and fully privileged Bash session by explicitly setting the UID to 0.
+       In the current root-privileged shell session, execute the following Python command:
+        ```bash
+            python -c 'import os;os.setuid(0);os.system("/bin/bash -p")'
+       ```
    
-    ```bash
-    python -c 'import os;os.setuid(0);os.system("/bin/bash -p")'
-    ```
    
    | Command Part | Function | Significance |
    | :--- | :--- | :--- |
