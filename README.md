@@ -683,7 +683,7 @@ The UDEV exploit requires the Process ID (PID) of the **Netlink socket** as an a
    **Goal:** Establish a permanent, stable, and fully privileged Bash session by explicitly setting the UID to 0.
     In the current root-privileged shell session, execute the following Python command:
  
-     `python -c 'import os;os.setuid(0);os.system("/bin/bash -p")'`
+     python -c 'import os;os.setuid(0);os.system("/bin/bash -p")'
    
    
    | Command Part | Function | Significance |
