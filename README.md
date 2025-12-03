@@ -354,14 +354,10 @@ The goal is to inject a second, non-ping command (`ls -l`) to prove that the use
    This information is vital for understanding the attacker's privilege level on the victim system.
 
 10. Obtaining a Reverse Shell:The objective of this phase is to establish a persistent, interactive command-line session (a **reverse shell**) on the victim machine. This method is more efficient for command execution than relying on the vulnerable web application interface.
-
-   A **reverse shell** is a connection initiated by the victim machine back to the attacker machine, granting the attacker a shell session. We will use the versatile **Netcat (`nc`)** utility for this task.
-
-
-   The first action is to prepare the attacker machine (Kali Linux) to **listen** for the incoming connection from the victim.
+    A **reverse shell** is a connection initiated by the victim machine back to the attacker machine, granting the attacker a shell session. We will use the versatile **Netcat (`nc`)** utility for this task.
+    The first action is to prepare the attacker machine (Kali Linux) to **listen** for the incoming connection from the victim.
       1.  On the **Attacker Machine (Kali Linux)**, open a new terminal window.
       2.  Execute the following command to start the Netcat listener on port `1234`:
-      
       ```bash
          nc -vv -l -p 1234
       ```
